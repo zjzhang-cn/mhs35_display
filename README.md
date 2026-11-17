@@ -8,7 +8,6 @@
 ```
 mhs35_display/
 ├── mhs35disp.py          # 通用显示入口：指定文字/图片
-├── mhs35weather.py       # 北京天气卡通显示入口，定时刷新
 ├── mhs35dash.py          # 多卡片仪表盘：天气/时间日历/主机信息，触摸切换
 ├── install.sh            # 独立安装/卸载 MHS35 overlay（不依赖 LCD-show）
 ├── overlays/
@@ -28,7 +27,6 @@ mhs35_display/
 │   ├── cards.py          # 时钟日历、主机信息、页面指示
 │   └── touch.py          # SPI 触摸读取与点击检测
 ├── systemd/
-│   ├── mhs35-weather.service
 │   └── mhs35-dashboard.service
 ├── requirements.txt
 ├── AGENTS.md             # 维护与开发约定
@@ -123,20 +121,12 @@ python3 mhs35disp.py "你好" --preview hello.png --size 480x320
 | `--demo` | 显示测试彩条 |
 | `--quiet` | 不输出成功提示 |
 
-## 天气模式（北京 · 卡通 · 定时刷新）
+## 天气卡片与数据源
+
+天气显示由 `mhs35dash.py` 的天气卡片提供，可先渲染预览：
 
 ```bash
-# 显示一帧后退出
-python3 mhs35weather.py --once
-
-# 不接屏，先生成 PNG 预览
-python3 mhs35weather.py --preview weather.png
-
-# 常驻运行，每 10 分钟刷新一次（默认）
-python3 mhs35weather.py --interval 600
-
-# 失败后 60 秒重试；网络不好时可调大 --timeout
-python3 mhs35weather.py --interval 600 --retry 60 --timeout 10
+python3 mhs35dash.py --preview weather.png --card weather
 ```
 
 画面内容：北京天气卡通场景（太阳/月亮、云朵、雨雪雷雾）、当前温度与天气、最高/最低温、湿度、风向风力、空气质量与 PM2.5、数据更新时间。本机 IP 只在仪表盘的主机信息卡片中显示。
@@ -144,20 +134,9 @@ python3 mhs35weather.py --interval 600 --retry 60 --timeout 10
 - 数据源：默认 `auto`，优先 `weather.cma.cn`（中国气象局，北京站 `54511`）；失败或关键字段不全时按 itboy → Open-Meteo 回退。
 - 空气质量：天气源不含 PM2.5 时（CMA / Open-Meteo），先请求 itboy，失败后再请求 `air-quality-api.open-meteo.com`；PM2.5 按中国浓度标准换算等级，空气质量请求失败不影响天气显示。
 - 缓存：成功数据写入 `$XDG_CACHE_HOME/mhs35_weather.json`（默认 `~/.cache/mhs35_weather.json`）。断网时继续显示上次数据，并出现橙色 `离线 · 上次数据` 标记，恢复网络后自动刷新。
-- 刷新间隔由 `--interval` 控制（默认 600 秒），失败重试由 `--retry` 控制（默认 60 秒）。
+- 刷新间隔由 `mhs35dash.py --interval` 控制（默认 600 秒），失败重试由 `--retry` 控制（默认 60 秒）。
 - 其他参数：`--provider cma|itboy|open-meteo|auto`、`--lat`/`--lon`、`--size`、`--font`、`--fb`、`--quiet`。
 - `--lat`/`--lon` 只对 Open-Meteo 生效（CMA 使用固定站号 `54511`，itboy 固定为北京），画面中的城市名固定显示“北京”。
-
-### 开机自动运行（systemd）
-
-```bash
-sudo cp ~/mhs35_display/systemd/mhs35-weather.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now mhs35-weather
-sudo systemctl status mhs35-weather
-```
-
-服务文件默认使用用户 `pi`、目录 `/home/pi/mhs35_display`；如不同请先修改。日志：`journalctl -u mhs35-weather -f`。
 
 ## 多卡片仪表盘（触摸切换）
 
@@ -168,17 +147,16 @@ python3 mhs35dash.py --preview dash.png --card host
 ```
 
 - 在屏幕任意位置轻触，切换到下一张卡片；底部三个圆点指示当前页，左下角有“轻触切换”提示。
-- 天气卡片：与 `mhs35weather.py` 相同的卡通场景，后台每 `--interval` 秒刷新；IP 只在主机卡片显示。
+- 天气卡片：北京天气卡通场景，后台每 `--interval` 秒刷新；IP 只在主机卡片显示。
 - 时间日历卡片：大号数字时钟（含秒）、日期/星期、当月日历，今天高亮。
 - 主机信息卡片：主机名/核心数、IP/网卡、内核、CPU 温度、负载、内存、磁盘使用率、运行时长。
-- 天气刷新参数与 `mhs35weather.py` 相同：`--interval`（默认 600）、`--retry`（默认 60）、`--timeout`（默认 8）、`--provider`、`--lat`/`--lon`。
+- 天气刷新参数：`--interval`（默认 600）、`--retry`（默认 60）、`--timeout`（默认 8）、`--provider`、`--lat`/`--lon`。
 - 触摸自动查找 SPI0 CS1（bus address `spi0.1`）上同时具备 ABS_X/ABS_Y 和按下能力（压力轴或 `BTN_TOUCH`）的输入设备，不按设备名匹配；可用 `--touch-device /dev/input/eventN`、`--no-touch`、`--touch-debug` 调试原始事件。
-- 同一时间只能有一个程序写 `/dev/fbN`；运行仪表盘前先停掉天气服务。
+- 同一时间只能有一个程序写 `/dev/fbN`；运行仪表盘前先停掉其他写屏程序。
 
 ### 开机自动运行（仪表盘）
 
 ```bash
-sudo systemctl disable --now mhs35-weather
 sudo cp ~/mhs35_display/systemd/mhs35-dashboard.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now mhs35-dashboard
@@ -192,7 +170,6 @@ sudo systemctl status mhs35-dashboard
 ```bash
 scp -r mhs35_display pi@<pi-ip>:~/
 ssh pi@<pi-ip> 'python3 ~/mhs35_display/mhs35disp.py "Hello MHS35"'
-ssh pi@<pi-ip> 'python3 ~/mhs35_display/mhs35weather.py --once'
 ```
 
 ## 说明

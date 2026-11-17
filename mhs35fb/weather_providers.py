@@ -132,7 +132,7 @@ def fetch_cma(timeout: int = 8) -> Weather:
 
 
 def fetch_itboy(timeout: int = 8) -> Weather:
-    request = urllib.request.Request(ITBOY_URL, headers={"User-Agent": "mhs35-weather/1.0"})
+    request = urllib.request.Request(ITBOY_URL, headers={"User-Agent": "mhs35-dashboard/1.0"})
     with urllib.request.urlopen(request, timeout=timeout) as response:
         payload = json.load(response)
     if payload.get("status") != 200:
@@ -269,7 +269,7 @@ def _fetch_open_meteo_air(
         "timezone": "Asia/Shanghai",
     }
     url = AIR_QUALITY_URL + "?" + urllib.parse.urlencode(params)
-    request = urllib.request.Request(url, headers={"User-Agent": "mhs35-weather/1.0"})
+    request = urllib.request.Request(url, headers={"User-Agent": "mhs35-dashboard/1.0"})
     with urllib.request.urlopen(request, timeout=timeout) as response:
         payload = json.load(response)
     value = (payload.get("current") or {}).get("pm2_5")

@@ -6,19 +6,19 @@ This file provides guidance to the AI agent when working with code in this repos
 
 Standalone Python display stack for the MHS35 3.5" LCD (ILI9486/fbtft, 480x320, rotate=90) on Raspberry Pi. It writes the Linux framebuffer directly (`/dev/fb1`) and reads the ADS7846 touchscreen via evdev; no X11 or fbcp dependency.
 
-Entry points: `mhs35dash.py` (multi-card dashboard, runs as a systemd service), `mhs35weather.py` (weather only), `mhs35disp.py` (text/image only). `install.sh` handles the overlay/SPI/rotation part of LCD-show.
+Entry points: `mhs35dash.py` (multi-card dashboard, runs as a systemd service), `mhs35disp.py` (text/image only). `install.sh` handles the overlay/SPI/rotation part of LCD-show.
 
 ## Platform and dependencies
 
 - Raspberry Pi OS; Python 3.11 on the reference Pi; Pillow required, numpy optional (faster RGB565 conversion).
 - No test suite, CI, lint, or package manifest. Verification is manual on the panel, or `--preview` for rendering only.
-- Reference device: a Raspberry Pi on the local network, app at `~/mhs35_display`, active service `mhs35-dashboard`. The weather-only service `mhs35-weather` is disabled on purpose.
+- Reference device: a Raspberry Pi on the local network, app at `~/mhs35_display`, active service `mhs35-dashboard`.
 
 ## Safety
 
 - Never write to the HDMI framebuffer or edit `/boot/config.txt` directly. `mhs35fb/framebuffer.py` selects only the SPI0 CS0 480x320/320x480 framebuffer; DRM devices are never selected.
 - Do not run `install.sh` for real without confirmation: it edits the boot config and needs a reboot. `sudo ./install.sh --dry-run` is safe.
-- Only one process may write the panel framebuffer (`/dev/fbN`). Stop the dashboard before running another writer, and leave `mhs35-weather` disabled.
+- Only one process may write the panel framebuffer (`/dev/fbN`). Stop the dashboard before running another writer.
 - Do not claim panel or touch verification unless it was actually done on hardware.
 
 ## Architecture
@@ -39,7 +39,6 @@ Entry points: `mhs35dash.py` (multi-card dashboard, runs as a systemd service), 
 ## Verification
 
 - Render without hardware: `python3 mhs35dash.py --preview /tmp/card.png --card weather` (also `clock`, `host`).
-- Weather only: `python3 mhs35weather.py --once` or `--preview`.
 - Generic content: `python3 mhs35disp.py "line"`.
 - Touch debugging: `python3 mhs35dash.py --start clock --touch-debug` prints raw events and the device path.
 - Service logs: `journalctl -u mhs35-dashboard -f`.
