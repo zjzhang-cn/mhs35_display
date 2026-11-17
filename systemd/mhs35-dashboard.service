@@ -1,0 +1,15 @@
+[Unit]
+Description=MHS35 multi-card dashboard (weather / clock / host)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/mhs35_display
+ExecStart=/usr/bin/python3 -u /home/pi/mhs35_display/mhs35dash.py --interval 600
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

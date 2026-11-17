@@ -1,0 +1,5 @@
+Pillow>=9.0
+
+# Optional: numpy makes RGB565 conversion much faster (already installed on
+# Raspberry Pi OS by default). Without it a pure-Python fallback is used.
+# numpy
