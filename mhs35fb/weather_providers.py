@@ -156,6 +156,8 @@ def fetch_itboy(timeout: int = 8) -> Weather:
         pm25 = None
     wind = f"{today.get('fx', '')} {_clean_fl(today.get('fl'))}".strip() or "—"
     updated = str((payload.get("cityInfo") or {}).get("updateTime") or payload.get("time") or "—").strip()
+    sunrise = str(today.get("sunrise") or "").strip()
+    sunset = str(today.get("sunset") or "").strip()
 
     return Weather(
         city=CITY,
@@ -172,6 +174,8 @@ def fetch_itboy(timeout: int = 8) -> Weather:
         updated=updated,
         fetched_at=datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S"),
         provider="itboy",
+        sunrise=sunrise,
+        sunset=sunset,
     )
 
 
@@ -209,7 +213,7 @@ def fetch_open_meteo(lat: float = BEIJING_LAT, lon: float = BEIJING_LON, timeout
             "temperature_2m,relative_humidity_2m,is_day,weather_code,"
             "wind_speed_10m,wind_direction_10m"
         ),
-        "daily": "weather_code,temperature_2m_max,temperature_2m_min",
+        "daily": "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset",
         "timezone": "Asia/Shanghai",
         "forecast_days": 1,
         "wind_speed_unit": "kmh",
@@ -222,6 +226,10 @@ def fetch_open_meteo(lat: float = BEIJING_LAT, lon: float = BEIJING_LON, timeout
     daily = payload["daily"]
     is_day = bool(current.get("is_day", 1))
     label, kind = _describe_wmo(int(current.get("weather_code", -1)), is_day)
+    sunrises = daily.get("sunrise") or []
+    sunsets = daily.get("sunset") or []
+    sunrise = str(sunrises[0]).split("T")[-1] if sunrises else ""
+    sunset = str(sunsets[0]).split("T")[-1] if sunsets else ""
 
     return Weather(
         city=CITY,
@@ -239,6 +247,8 @@ def fetch_open_meteo(lat: float = BEIJING_LAT, lon: float = BEIJING_LON, timeout
         updated=str(current.get("time", "")).split("T")[-1] or "—",
         fetched_at=datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S"),
         provider="open-meteo",
+        sunrise=sunrise,
+        sunset=sunset,
     )
 
 
@@ -305,6 +315,54 @@ def fetch_air_quality(
     raise RuntimeError(" | ".join(errors))
 
 
+def _fill_supplement(weather: Weather, extra: Weather) -> None:
+    if weather.pm25 is None and extra.pm25 is not None:
+        weather.pm25 = extra.pm25
+        quality = extra.quality
+        weather.quality = quality if quality and quality != "—" else _quality_from_pm25(extra.pm25)
+    elif (not weather.quality or weather.quality == "—") and extra.quality and extra.quality != "—":
+        weather.quality = extra.quality
+    if not weather.sunrise and extra.sunrise:
+        weather.sunrise = extra.sunrise
+    if not weather.sunset and extra.sunset:
+        weather.sunset = extra.sunset
+
+
+def _supplement_weather(
+    weather: Weather, name: str, lat: float, lon: float, timeout: int
+) -> Weather:
+    if name != "itboy" and (weather.pm25 is None or not weather.sunrise or not weather.sunset):
+        try:
+            extra = fetch_itboy(timeout)
+        except Exception:  # noqa: BLE001 - supplements are optional
+            pass
+        else:
+            _fill_supplement(weather, extra)
+
+    if weather.pm25 is None:
+        air_lat, air_lon = (lat, lon) if name == "open-meteo" else (BEIJING_LAT, BEIJING_LON)
+        try:
+            pm25, quality = _fetch_open_meteo_air(air_lat, air_lon, timeout)
+        except Exception:  # noqa: BLE001 - air quality is optional
+            pass
+        else:
+            if pm25 is not None:
+                weather.pm25 = pm25
+                weather.quality = quality
+
+    if not weather.sunrise or not weather.sunset:
+        try:
+            extra = fetch_open_meteo(lat, lon, timeout)
+        except Exception:  # noqa: BLE001 - sun times are optional
+            pass
+        else:
+            if not weather.sunrise and extra.sunrise:
+                weather.sunrise = extra.sunrise
+            if not weather.sunset and extra.sunset:
+                weather.sunset = extra.sunset
+    return weather
+
+
 def fetch_weather(
     *,
     provider: str = "auto",
@@ -328,18 +386,6 @@ def fetch_weather(
             errors.append(f"{name}: {exc}")
             continue
 
-        if weather.pm25 is None:
-            air_lat, air_lon = (lat, lon) if name == "open-meteo" else (BEIJING_LAT, BEIJING_LON)
-            try:
-                pm25, quality = fetch_air_quality(
-                    air_lat, air_lon, timeout, include_itboy=(name != "itboy")
-                )
-            except Exception:  # noqa: BLE001 - air quality is optional
-                pass
-            else:
-                if pm25 is not None:
-                    weather.pm25 = pm25
-                    weather.quality = quality
-        return weather
+        return _supplement_weather(weather, name, lat, lon, timeout)
 
     raise RuntimeError(" | ".join(errors))

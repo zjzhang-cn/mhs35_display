@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import random
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -64,13 +65,31 @@ _GROUND_COLORS = {
 }
 
 
-def _time_slot(now: Optional[datetime] = None) -> str:
-    hour = (now or datetime.now()).hour
-    if 5 <= hour < 8:
+def _parse_clock(text: str) -> Optional[int]:
+    match = re.search(r"(\d{1,2}):(\d{2})", str(text or ""))
+    if not match:
+        return None
+    return int(match.group(1)) * 60 + int(match.group(2))
+
+
+def _time_slot(weather: Optional[Weather] = None, now: Optional[datetime] = None) -> str:
+    current = now or datetime.now()
+    minutes = current.hour * 60 + current.minute
+    sunrise = _parse_clock(weather.sunrise) if weather else None
+    sunset = _parse_clock(weather.sunset) if weather else None
+    if sunrise is not None and sunset is not None and sunrise < sunset:
+        if minutes < sunrise - 60 or minutes >= sunset + 60:
+            return "night"
+        if minutes < sunrise + 60:
+            return "dawn"
+        if minutes < sunset - 60:
+            return "day"
+        return "dusk"
+    if 5 <= current.hour < 8:
         return "dawn"
-    if 8 <= hour < 17:
+    if 8 <= current.hour < 17:
         return "day"
-    if 17 <= hour < 20:
+    if 17 <= current.hour < 20:
         return "dusk"
     return "night"
 
@@ -278,7 +297,7 @@ def render_weather(
     stale: bool = False,
     interval: int = 600,
 ) -> Image.Image:
-    slot = _time_slot()
+    slot = _time_slot(weather)
     kind = _scene_kind(weather.kind, slot)
     top, bottom = _palette(kind, slot)
     canvas = gradient((width, height), top, bottom)

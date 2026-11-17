@@ -26,3 +26,5 @@ class Weather:
     updated: str
     fetched_at: str
     provider: str
+    sunrise: str = ""
+    sunset: str = ""
