@@ -28,8 +28,10 @@ Options:
   -h, --help        Show this help
 
 The script enables spi, copies overlays/mhs35.dtbo and adds
-dtoverlay=mhs35:rotate=ROTATION to the boot config. A reboot is required.
-It does not install X11 calibration, fbturbo or fbcp.
+dtoverlay=mhs35:rotate=ROTATION to the boot config. It also installs a udev
+rule that makes the desktop ignore the ADS7846 touchscreen, leaving it for
+mhs35dash. A reboot is required. It does not install X11 calibration,
+fbturbo or fbcp.
 EOF
 }
 
@@ -77,12 +79,25 @@ if [[ ! -f "$OVERLAY_SRC" ]]; then
   exit 1
 fi
 
+UDEV_RULES_DIR=/etc/udev/rules.d
+UDEV_RULE=99-mhs35-touch-ignore.rules
+UDEV_SRC="$SCRIPT_DIR/udev/$UDEV_RULE"
+if [[ ! -f "$UDEV_SRC" ]]; then
+  echo "error: missing udev rule: $UDEV_SRC" >&2
+  exit 1
+fi
+
 run() {
   if [[ "$DRY_RUN" -eq 1 ]]; then
     printf '[dry-run] %s\n' "$*"
   else
     "$@"
   fi
+}
+
+reload_udev() {
+  run udevadm control --reload-rules
+  run udevadm trigger --subsystem-match=input --action=change
 }
 
 backup_config() {
@@ -129,6 +144,14 @@ if [[ "$UNINSTALL" -eq 1 ]]; then
     echo "no mhs35.dtbo found"
   fi
 
+  if [[ -e "$UDEV_RULES_DIR/$UDEV_RULE" ]]; then
+    run rm -f "$UDEV_RULES_DIR/$UDEV_RULE"
+    echo "removed $UDEV_RULES_DIR/$UDEV_RULE"
+    reload_udev
+  else
+    echo "no $UDEV_RULE found"
+  fi
+
   echo "MHS35 overlay removed. Reboot to use HDMI output again."
   if [[ "$REBOOT" -eq 1 ]]; then
     run reboot
@@ -143,6 +166,9 @@ echo "  rotate:  $ROTATION"
 
 backup_config
 run install -m 644 "$OVERLAY_SRC" "$OVERLAY_DIR/mhs35.dtbo"
+run install -D -m 644 "$UDEV_SRC" "$UDEV_RULES_DIR/$UDEV_RULE"
+reload_udev
+echo "desktop input will ignore the ADS7846 touchscreen"
 
 if grep -qE '^[[:space:]]*dtparam=spi=on' "$CONFIG"; then
   echo "SPI already enabled"

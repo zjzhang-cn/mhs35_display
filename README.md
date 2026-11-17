@@ -13,6 +13,8 @@ mhs35_display/
 ├── install.sh            # 独立安装/卸载 MHS35 overlay（不依赖 LCD-show）
 ├── overlays/
 │   └── mhs35.dtbo        # MHS35 device-tree overlay
+├── udev/
+│   └── 99-mhs35-touch-ignore.rules  # 让桌面/libinput 忽略 ADS7846 触摸
 ├── mhs35fb/
 │   ├── __init__.py
 │   ├── framebuffer.py    # 帧缓冲探测、mmap、RGB565 输出
@@ -41,8 +43,9 @@ sudo ./install.sh --install-deps   # 同时安装 python3-pil / python3-numpy
 
 - 安装前会把 `/boot/firmware/config.txt`（旧系统为 `/boot/config.txt`）备份为 `config.txt.bak-mhs35-<时间>`。
 - 自动启用 `dtparam=spi=on`，复制 `overlays/mhs35.dtbo`，写入 `dtoverlay=mhs35:rotate=90`。
+- 安装 `udev/99-mhs35-touch-ignore.rules`，让桌面（libinput/Wayfire）忽略 ADS7846。触摸设备仍由 `mhs35dash` 直接读取，HDMI 桌面上的鼠标键盘不受影响。
 - 安装后需要重启：`sudo reboot`；加 `--reboot` 可自动重启。
-- 卸载后重启可恢复 HDMI 输出。
+- 卸载后重启可恢复 HDMI 输出，并移除上述 udev 规则。
 
 ## 前置条件
 

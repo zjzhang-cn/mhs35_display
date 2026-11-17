@@ -1,0 +1,3 @@
+# Keep the MHS35 touchscreen out of the desktop input stack.
+# mhs35dash reads /dev/input/event* directly.
+SUBSYSTEM=="input", ATTRS{name}=="ADS7846 Touchscreen", ENV{LIBINPUT_IGNORE_DEVICE}="1"
