@@ -279,6 +279,7 @@ def _palette(kind: str, is_day: bool):
 
 
 def _face(draw, cx, cy, radius, *, mood: str = "happy"):
+    radius = int(radius)
     eye_dx = max(6, radius // 3)
     eye_r = max(2, radius // 8)
     eye_y = cy - radius // 8
