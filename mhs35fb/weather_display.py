@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import random
+from datetime import datetime
 from typing import Optional
 
 from PIL import Image, ImageDraw
@@ -11,29 +12,83 @@ from PIL import Image, ImageDraw
 from .render import draw_text, gradient, render as render_text
 from .weather_model import Weather
 
+_DAWN_PALETTES = {
+    "sun": ("#F6A77B", "#FFE1C4"),
+    "partly": ("#E89A8C", "#FFD8C2"),
+    "cloudy": ("#B49A9A", "#EAD9D2"),
+    "rain": ("#8C7E96", "#C7B9C7"),
+    "storm": ("#5E4B6B", "#9A7F9C"),
+    "snow": ("#C9A9B4", "#F5E6EA"),
+    "fog": ("#A9929B", "#E4D6D7"),
+    "wind": ("#D99A86", "#FFE0CC"),
+}
 
-def _palette(kind: str, is_day: bool):
-    if not is_day:
-        return {
-            "moon": ("#1B2A4A", "#40587F"),
-            "partly_night": ("#1D2C4E", "#4A628C"),
-            "cloudy": ("#26344F", "#5A6E8C"),
-            "rain": ("#1F2C44", "#50647F"),
-            "storm": ("#1A2238", "#41506E"),
-            "snow": ("#25384E", "#7188A0"),
-            "fog": ("#2C394C", "#66788C"),
-            "wind": ("#1E3348", "#536B84"),
-        }.get(kind, ("#1B2A4A", "#40587F"))
-    return {
-        "sun": ("#57BDF5", "#D7F3FF"),
-        "partly": ("#6CC4F2", "#DDF5FF"),
-        "cloudy": ("#8AA7C2", "#D6E4EF"),
-        "rain": ("#6D88A8", "#B9CFDF"),
-        "storm": ("#4A5A78", "#8B9DB8"),
-        "snow": ("#7FA8CB", "#E9F6FF"),
-        "fog": ("#9AAAB8", "#DCE6EC"),
-        "wind": ("#7EC8E3", "#E0F5FC"),
-    }.get(kind, ("#66BFF0", "#DDF3FF"))
+_DAY_PALETTES = {
+    "sun": ("#57BDF5", "#D7F3FF"),
+    "partly": ("#6CC4F2", "#DDF5FF"),
+    "cloudy": ("#8AA7C2", "#D6E4EF"),
+    "rain": ("#6D88A8", "#B9CFDF"),
+    "storm": ("#4A5A78", "#8B9DB8"),
+    "snow": ("#7FA8CB", "#E9F6FF"),
+    "fog": ("#9AAAB8", "#DCE6EC"),
+    "wind": ("#7EC8E3", "#E0F5FC"),
+}
+
+_DUSK_PALETTES = {
+    "sun": ("#FF7E5F", "#FEB47B"),
+    "partly": ("#D96C7E", "#F8B195"),
+    "cloudy": ("#6C5B7B", "#C06C84"),
+    "rain": ("#4B3F5E", "#8E6C88"),
+    "storm": ("#2E2238", "#6A4C6D"),
+    "snow": ("#7A6A8A", "#D8C7D8"),
+    "fog": ("#7D6B7A", "#C9B8C2"),
+    "wind": ("#B56576", "#EAAC8B"),
+}
+
+_NIGHT_PALETTES = {
+    "moon": ("#1B2A4A", "#40587F"),
+    "partly_night": ("#1D2C4E", "#4A628C"),
+    "cloudy": ("#26344F", "#5A6E8C"),
+    "rain": ("#1F2C44", "#50647F"),
+    "storm": ("#1A2238", "#41506E"),
+    "snow": ("#25384E", "#7188A0"),
+    "fog": ("#2C394C", "#66788C"),
+    "wind": ("#1E3348", "#536B84"),
+}
+
+_GROUND_COLORS = {
+    "dawn": "#5B7F57",
+    "day": "#6FBF63",
+    "dusk": "#456B47",
+    "night": "#2E4A3A",
+}
+
+
+def _time_slot(now: Optional[datetime] = None) -> str:
+    hour = (now or datetime.now()).hour
+    if 5 <= hour < 8:
+        return "dawn"
+    if 8 <= hour < 17:
+        return "day"
+    if 17 <= hour < 20:
+        return "dusk"
+    return "night"
+
+
+def _scene_kind(kind: str, slot: str) -> str:
+    if slot == "night":
+        return {"sun": "moon", "partly": "partly_night"}.get(kind, kind)
+    return {"moon": "sun", "partly_night": "partly"}.get(kind, kind)
+
+
+def _palette(kind: str, slot: str):
+    table = {
+        "dawn": _DAWN_PALETTES,
+        "day": _DAY_PALETTES,
+        "dusk": _DUSK_PALETTES,
+        "night": _NIGHT_PALETTES,
+    }[slot]
+    return table.get(kind, table["cloudy"])
 
 
 def _face(draw, cx, cy, radius, *, mood: str = "happy"):
@@ -223,15 +278,16 @@ def render_weather(
     stale: bool = False,
     interval: int = 600,
 ) -> Image.Image:
-    kind = weather.kind
-    top, bottom = _palette(kind, weather.is_day)
+    slot = _time_slot()
+    kind = _scene_kind(weather.kind, slot)
+    top, bottom = _palette(kind, slot)
     canvas = gradient((width, height), top, bottom)
     draw = ImageDraw.Draw(canvas)
 
-    if not weather.is_day:
+    if slot == "night":
         _stars(draw, width)
 
-    ground = "#6FBF63" if weather.is_day else "#2E4A3A"
+    ground = _GROUND_COLORS[slot]
     draw.ellipse((-90, int(height * 0.46), width + 90, height + 120), fill=ground)
 
     cx = int(width * 0.33)
@@ -265,10 +321,10 @@ def render_weather(
         _cloud(draw, cx, cy, 1.0)
         _cloud(draw, cx + 74, cy - 24, 0.55, face=False)
 
-    shadow = "#1F3A52" if weather.is_day else "#0B1220"
+    shadow = "#1F3A52" if slot in ("dawn", "day") else "#0B1220"
     draw_text(canvas, (18, 10), weather.city, 27, "#FFFFFF", font_path=font_path,
               shadow=shadow, shadow_offset=(2, 2))
-    draw_text(canvas, (width - 18, int(height * 0.09)), f"{weather.temperature:.0f}°", 58,
+    draw_text(canvas, (width - 18, int(height * 0.09)), f"{weather.temperature:.1f}°", 58,
               "#FFFFFF", font_path=font_path, align="right", shadow=shadow, shadow_offset=(3, 3))
     draw_text(canvas, (width - 18, int(height * 0.31)), weather.label, 25, "#FFFFFF",
               font_path=font_path, align="right", shadow=shadow, shadow_offset=(2, 2))

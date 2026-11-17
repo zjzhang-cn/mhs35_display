@@ -129,7 +129,7 @@ python3 mhs35disp.py "你好" --preview hello.png --size 480x320
 python3 mhs35dash.py --preview weather.png --card weather
 ```
 
-画面内容：北京天气卡通场景（太阳/月亮、云朵、雨雪雷雾）、当前温度与天气、最高/最低温、湿度、风向风力、空气质量与 PM2.5、数据更新时间。本机 IP 只在仪表盘的主机信息卡片中显示。
+画面内容：北京天气卡通场景（太阳/月亮、云朵、雨雪雷雾）、当前温度与天气、最高/最低温、湿度、风向风力、空气质量与 PM2.5、数据更新时间。天空配色按本地时间在清晨、白天、黄昏、夜晚之间切换；本机 IP 只在仪表盘的主机信息卡片中显示。
 
 - 数据源：默认 `auto`，优先 `weather.cma.cn`（中国气象局，北京站 `54511`）；失败或关键字段不全时按 itboy → Open-Meteo 回退。
 - 空气质量：天气源不含 PM2.5 时（CMA / Open-Meteo），先请求 itboy，失败后再请求 `air-quality-api.open-meteo.com`；PM2.5 按中国浓度标准换算等级，空气质量请求失败不影响天气显示。

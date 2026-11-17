@@ -25,10 +25,10 @@ Entry points: `mhs35dash.py` (multi-card dashboard, runs as a systemd service), 
 
 - `mhs35fb/framebuffer.py` — framebuffer discovery, fb ioctl structs, mmap, RGB565/32bpp blit, panel deferred-IO flush delay.
 - `mhs35fb/render.py` — Pillow drawing, gradients, mixed-font text. CJK uses DroidSansFallbackFull and Latin uses DejaVu; the CJK font lacks Latin glyphs, so preserve the per-run font split.
-- `mhs35fb/weather.py` — weather façade and weather-only run loop.
+- `mhs35fb/weather.py` — weather façade: data model, providers and cache.
 - `mhs35fb/weather_model.py` — `Weather` dataclass and location constants.
 - `mhs35fb/weather_providers.py` — CMA/itboy/Open-Meteo/AQ providers and multi-source merge; must stay Pillow-free.
-- `mhs35fb/weather_display.py` — cartoon scenes and weather panel rendering.
+- `mhs35fb/weather_display.py` — cartoon scenes and weather panel rendering with dawn/day/dusk/night palettes.
 - `mhs35fb/weather_cache.py` — weather cache read/write.
 - `mhs35fb/net.py` — local IP helpers for the host info card.
 - `mhs35fb/cards.py` — clock/calendar card, host metrics card, page composition and dots.
