@@ -12,7 +12,7 @@ Entry points: `mhs35dash.py` (multi-card dashboard, runs as a systemd service), 
 
 - Raspberry Pi OS; Python 3.11 on the reference Pi; Pillow required, numpy optional (faster RGB565 conversion).
 - No test suite, CI, lint, or package manifest. Verification is manual on the panel, or `--preview` for rendering only.
-- Reference device: `pi@<pi-ip>`, app at `~/mhs35_display`, active service `mhs35-dashboard`. The weather-only service `mhs35-weather` is disabled on purpose.
+- Reference device: a Raspberry Pi on the local network, app at `~/mhs35_display`, active service `mhs35-dashboard`. The weather-only service `mhs35-weather` is disabled on purpose.
 
 ## Safety
 
