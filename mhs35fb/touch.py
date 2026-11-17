@@ -1,4 +1,4 @@
-"""ADS7846 resistive touch input for the MHS35 panel."""
+"""SPI resistive touch input for the MHS35 panel."""
 
 from __future__ import annotations
 
@@ -26,6 +26,7 @@ ABS_Y = 1
 ABS_PRESSURE = 24
 BTN_TOUCH = 0x14A
 EVIOCGABS = 0x80184540
+MHS35_TOUCH_ADDRESS = "spi0.1"
 
 
 @dataclass
@@ -35,15 +36,50 @@ class Tap:
     duration: float
 
 
+def _read(path: str) -> str:
+    try:
+        with open(path, encoding="utf-8") as handle:
+            return handle.read().strip()
+    except OSError:
+        return ""
+
+
+def _spi_address(sysdir: str) -> str:
+    current = os.path.realpath(sysdir)
+    for _ in range(5):
+        subsystem = os.path.join(current, "subsystem")
+        if os.path.exists(subsystem) and os.path.basename(os.path.realpath(subsystem)) == "spi":
+            return os.path.basename(current)
+        parent = os.path.dirname(current)
+        if parent == current:
+            break
+        current = parent
+    return ""
+
+
+def _has_key(event: str, code: int) -> bool:
+    words = _read(f"/sys/class/input/{event}/device/capabilities/key").split()
+    index, bit = divmod(code, 32)
+    if index >= len(words):
+        return False
+    try:
+        return bool(int(words[-1 - index], 16) & (1 << bit))
+    except ValueError:
+        return False
+
+
 def find_touch_device() -> Optional[str]:
     for path in sorted(glob.glob("/dev/input/event*")):
-        name_path = f"/sys/class/input/{os.path.basename(path)}/device/name"
-        try:
-            with open(name_path, encoding="utf-8") as handle:
-                name = handle.read().strip()
-        except OSError:
+        event = os.path.basename(path)
+        if _spi_address(f"/sys/class/input/{event}/device") != MHS35_TOUCH_ADDRESS:
             continue
-        if "ADS7846" in name or "Touchscreen" in name:
+        try:
+            abs_mask = int(_read(f"/sys/class/input/{event}/device/capabilities/abs"), 16)
+        except ValueError:
+            continue
+        if abs_mask & 0x3 != 0x3:
+            continue
+        if abs_mask & (1 << ABS_PRESSURE) or _has_key(event, BTN_TOUCH):
             return path
     return None
 
@@ -61,7 +97,7 @@ def _axis_range(fd: int, axis: int):
 
 
 class TouchReader(threading.Thread):
-    """Reads ADS7846 events and enqueues taps (press + quick release)."""
+    """Reads SPI touch events and enqueues taps (press + quick release)."""
 
     def __init__(
         self,

@@ -14,14 +14,14 @@ mhs35_display/
 ├── overlays/
 │   └── mhs35.dtbo        # MHS35 device-tree overlay
 ├── udev/
-│   └── 99-mhs35-touch-ignore.rules  # 让桌面/libinput 忽略 ADS7846 触摸
+│   └── 99-mhs35-touch-ignore.rules  # 让桌面/libinput 忽略 SPI 触摸
 ├── mhs35fb/
 │   ├── __init__.py
 │   ├── framebuffer.py    # 帧缓冲探测、mmap、RGB565 输出
 │   ├── render.py         # Pillow 文本/图片渲染
 │   ├── weather.py        # 天气获取、卡通场景、缓存
 │   ├── cards.py          # 时钟日历、主机信息、页面指示
-│   └── touch.py          # ADS7846 触摸读取与点击检测
+│   └── touch.py          # SPI 触摸读取与点击检测
 ├── systemd/
 │   ├── mhs35-weather.service
 │   └── mhs35-dashboard.service
@@ -43,7 +43,7 @@ sudo ./install.sh --install-deps   # 同时安装 python3-pil / python3-numpy
 
 - 安装前会把 `/boot/firmware/config.txt`（旧系统为 `/boot/config.txt`）备份为 `config.txt.bak-mhs35-<时间>`。
 - 自动启用 `dtparam=spi=on`，复制 `overlays/mhs35.dtbo`，写入 `dtoverlay=mhs35:rotate=90`。
-- 安装 `udev/99-mhs35-touch-ignore.rules`，让桌面（libinput/Wayfire）忽略 ADS7846。触摸设备仍由 `mhs35dash` 直接读取，HDMI 桌面上的鼠标键盘不受影响。
+- 安装 `udev/99-mhs35-touch-ignore.rules`，让桌面（libinput/Wayfire）忽略 SPI0 CS1 触摸。触摸设备仍由 `mhs35dash` 直接读取，HDMI 桌面上的鼠标键盘不受影响。
 - 安装后需要重启：`sudo reboot`；加 `--reboot` 可自动重启。
 - 卸载后重启可恢复 HDMI 输出，并移除上述 udev 规则。
 
@@ -57,7 +57,7 @@ sudo ./install.sh --install-deps   # 同时安装 python3-pil / python3-numpy
    sudo reboot
    ```
 
-   也可以使用 LCD-show 仓库的 `sudo ./MHS35-show 90`。重启后应出现 `fb_ili9486` 帧缓冲设备，通常为 `/dev/fb1`，分辨率 480×320。
+   也可以使用 LCD-show 仓库的 `sudo ./MHS35-show 90`。重启后应出现面板的帧缓冲设备（通常为 `/dev/fb0` 或 `/dev/fb1`），分辨率 480×320。
 
 2. Python 3 与 Pillow；numpy 可选（有则转换更快）：
 
@@ -162,7 +162,7 @@ python3 mhs35dash.py --preview dash.png --card host
 - 天气卡片：与 `mhs35weather.py` 相同的卡通场景，后台每 `--interval` 秒刷新；IP 只在主机卡片显示。
 - 时间日历卡片：大号数字时钟（含秒）、日期/星期、当月日历，今天高亮。
 - 主机信息卡片：主机名/核心数、IP/网卡、内核、CPU 温度、负载、内存、磁盘使用率、运行时长。
-- 触摸自动查找 ADS7846 设备；可用 `--touch-device /dev/input/eventN`、`--no-touch`、`--touch-debug` 调试原始事件。
+- 触摸自动查找 SPI0 CS1 上的触摸输入设备；可用 `--touch-device /dev/input/eventN`、`--no-touch`、`--touch-debug` 调试原始事件。
 - 同一时间只能有一个程序写 `/dev/fb1`；运行仪表盘前先停掉天气服务。
 
 ### 开机自动运行（仪表盘）
@@ -187,7 +187,7 @@ ssh pi@<pi-ip> 'python3 ~/mhs35_display/mhs35weather.py --once'
 
 ## 说明
 
-- 自动探测顺序：优先 `ili9486`/`fbtft` 名称的设备，其次 480×320/320×480 的非 DRM 帧缓冲；不会误写 HDMI 的 `vc4drmfb`。
+- 自动探测：只选择 SPI0 CS0 上的 480×320/320×480 帧缓冲，不按设备名称匹配；DRM/HDMI 帧缓冲不会被写入。
 - 输出格式为 RGB565（16bpp），若帧缓冲为 32bpp 则按 BGRX 输出。
 - 天气数据无需 API key，只需网络；Open-Meteo 在部分网络下不可达时会自动改用 itboy。
-- 触摸输入（ADS7846）未包含在本程序中。
+- 触摸输入未包含在 `mhs35disp.py` 中。

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Display user-specified content on an MHS35 3.5" LCD (480x320, fbtft).
+"""Display user-specified content on an MHS35 3.5" LCD (480x320).
 
 Examples:
     python3 mhs35disp.py "Hello" "MHS35"
@@ -44,8 +44,8 @@ def _build_parser() -> argparse.ArgumentParser:
         description='Show specified text or an image on an MHS35 3.5" LCD.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
-            "Framebuffer selection is automatic: the program looks for the fbtft/ILI9486\n"
-            "device (normally /dev/fb1 at 480x320). Use --fb to override.\n\n"
+            "Framebuffer selection is automatic: the program looks for the MHS35\n"
+            "framebuffer on SPI0 CS0 at 480x320. Use --fb to override.\n\n"
             "Without the panel enabled, render to a PNG with --preview."
         ),
     )

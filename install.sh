@@ -29,7 +29,7 @@ Options:
 
 The script enables spi, copies overlays/mhs35.dtbo and adds
 dtoverlay=mhs35:rotate=ROTATION to the boot config. It also installs a udev
-rule that makes the desktop ignore the ADS7846 touchscreen, leaving it for
+rule that makes the desktop ignore the SPI0 CS1 touchscreen, leaving it for
 mhs35dash. A reboot is required. It does not install X11 calibration,
 fbturbo or fbcp.
 EOF
@@ -168,7 +168,7 @@ backup_config
 run install -m 644 "$OVERLAY_SRC" "$OVERLAY_DIR/mhs35.dtbo"
 run install -D -m 644 "$UDEV_SRC" "$UDEV_RULES_DIR/$UDEV_RULE"
 reload_udev
-echo "desktop input will ignore the ADS7846 touchscreen"
+echo "desktop input will ignore the SPI0 CS1 touchscreen"
 
 if grep -qE '^[[:space:]]*dtparam=spi=on' "$CONFIG"; then
   echo "SPI already enabled"

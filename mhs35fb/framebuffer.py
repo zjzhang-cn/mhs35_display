@@ -1,4 +1,4 @@
-"""Linux framebuffer output for the MHS35 (ILI9486 / fbtft) 3.5" LCD."""
+"""Linux framebuffer output for the MHS35 3.5" LCD."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ FBIOGET_VSCREENINFO = 0x4600
 FBIOGET_FSCREENINFO = 0x4602
 
 MHS35_SIZES = {(480, 320), (320, 480)}
-DRM_MARKERS = ("vc4drmfb", "simpledrm", "drmfb", "fbcon")
+MHS35_SPI_ADDRESS = "spi0.0"
 
 
 class _Bitfield(ctypes.Structure):
@@ -83,17 +83,21 @@ class _FixScreeninfo(ctypes.Structure):
 @dataclass(frozen=True)
 class FramebufferDevice:
     path: str
-    name: str
     width: int
     height: int
     bpp: int
+    bus: str = ""
+    address: str = ""
 
     @property
     def size(self):
         return (self.width, self.height)
 
     def __str__(self):
-        return f"{self.path}  {self.name}  {self.width}x{self.height}  {self.bpp}bpp"
+        return (
+            f"{self.path}  {self.width}x{self.height}  {self.bpp}bpp"
+            f"  bus={self.bus or '?'}  address={self.address or '?'}"
+        )
 
 
 def _read(path: str, default: str = "") -> str:
@@ -104,14 +108,28 @@ def _read(path: str, default: str = "") -> str:
         return default
 
 
+def _bus(fb_dir: str) -> str:
+    link = os.path.join(fb_dir, "device", "subsystem")
+    if not os.path.exists(link):
+        return ""
+    return os.path.basename(os.path.realpath(link))
+
+
+def _address(fb_dir: str) -> str:
+    link = os.path.join(fb_dir, "device")
+    if not os.path.exists(link):
+        return ""
+    return os.path.basename(os.path.realpath(link))
+
+
 def list_devices():
     devices = []
-    for name_path in sorted(glob.glob("/sys/class/graphics/fb*/name")):
-        fb_dir = os.path.dirname(name_path)
+    for fb_dir in sorted(glob.glob("/sys/class/graphics/fb*")):
+        if not os.path.exists(os.path.join(fb_dir, "virtual_size")):
+            continue
         path = "/dev/" + os.path.basename(fb_dir)
         if not os.path.exists(path):
             continue
-        name = _read(name_path, "?")
         try:
             width, height = (int(part) for part in _read(os.path.join(fb_dir, "virtual_size")).split(","))
         except ValueError:
@@ -120,19 +138,14 @@ def list_devices():
             bpp = int(_read(os.path.join(fb_dir, "bits_per_pixel"), "0"))
         except ValueError:
             bpp = 0
-        devices.append(FramebufferDevice(path, name, width, height, bpp))
+        bus = _bus(fb_dir)
+        address = _address(fb_dir) if bus == "spi" else ""
+        devices.append(FramebufferDevice(path, width, height, bpp, bus, address))
     return devices
 
 
 def is_mhs35(device: FramebufferDevice) -> bool:
-    if device.width <= 0 or device.height <= 0:
-        return False
-    name = device.name.lower()
-    if any(marker in name for marker in DRM_MARKERS):
-        return False
-    if "ili9486" in name or "fbtft" in name:
-        return True
-    return device.size in MHS35_SIZES
+    return device.size in MHS35_SIZES and device.address == MHS35_SPI_ADDRESS
 
 
 def find_framebuffer(path: Optional[str] = None) -> str:
@@ -144,7 +157,7 @@ def find_framebuffer(path: Optional[str] = None) -> str:
     devices = list_devices()
     matches = [device for device in devices if is_mhs35(device)]
     if matches:
-        matches.sort(key=lambda d: (0 if "ili9486" in d.name.lower() else 1, d.path))
+        matches.sort(key=lambda d: d.path)
         return matches[0].path
 
     available = ", ".join(str(device) for device in devices) or "no framebuffer devices"
@@ -272,5 +285,5 @@ class Framebuffer:
         except (BufferError, ValueError):
             pass
         if delay > 0:
-            # fbtft uses deferred IO; give its worker time to push the frame.
+            # The panel driver uses deferred IO; give its worker time to push the frame.
             time.sleep(delay)
