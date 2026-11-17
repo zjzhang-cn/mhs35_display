@@ -50,8 +50,8 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="retry delay after a fetch failure (default: 60)")
     parser.add_argument("--timeout", type=_positive_int, default=8, metavar="SECONDS",
                         help="network timeout (default: 8)")
-    parser.add_argument("--provider", choices=("auto", "itboy", "open-meteo"), default="auto",
-                        help="weather source (default: auto)")
+    parser.add_argument("--provider", choices=("auto", "cma", "itboy", "open-meteo"), default="auto",
+                        help="weather source (default: auto, cma -> itboy -> open-meteo)")
     parser.add_argument("--lat", type=float, default=weather_mod.BEIJING_LAT)
     parser.add_argument("--lon", type=float, default=weather_mod.BEIJING_LON)
     parser.add_argument("--once", action="store_true", help="draw one frame and exit")

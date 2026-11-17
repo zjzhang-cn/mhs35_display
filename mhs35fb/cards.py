@@ -11,8 +11,10 @@ from typing import Optional
 
 from PIL import Image, ImageDraw
 
+from .net import local_ip
 from .render import draw_text, gradient
-from .weather import Weather, local_ip, render_offline, render_weather
+from .weather_display import render_offline, render_weather
+from .weather_model import Weather
 
 BOTTOM_STRIP = 14
 CARD_NAMES = ("天气", "时间日历", "主机信息")
@@ -240,12 +242,11 @@ def render_host_card(width: int, height: int, info: Optional[dict] = None,
 
 def render_weather_card(width: int, height: int, weather: Optional[Weather], *,
                         stale: bool = False, interval: int = 600,
-                        font_path: Optional[str] = None, show_ip: bool = True) -> Image.Image:
+                        font_path: Optional[str] = None) -> Image.Image:
     if weather is None:
-        return render_offline(width, height, "正在获取天气数据…", font_path=font_path,
-                              show_ip=show_ip)
+        return render_offline(width, height, "正在获取天气数据…", font_path=font_path)
     return render_weather(width, height, weather, stale=stale, interval=interval,
-                          font_path=font_path, show_ip=show_ip)
+                          font_path=font_path)
 
 
 def compose(card: Image.Image, index: int, width: int, height: int,

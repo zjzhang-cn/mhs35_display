@@ -25,7 +25,12 @@ Entry points: `mhs35dash.py` (multi-card dashboard, runs as a systemd service), 
 
 - `mhs35fb/framebuffer.py` — framebuffer discovery, fb ioctl structs, mmap, RGB565/32bpp blit, panel deferred-IO flush delay.
 - `mhs35fb/render.py` — Pillow drawing, gradients, mixed-font text. CJK uses DroidSansFallbackFull and Latin uses DejaVu; the CJK font lacks Latin glyphs, so preserve the per-run font split.
-- `mhs35fb/weather.py` — itboy weather API (reachable from the Pi) with Open-Meteo fallback, cache at `~/.cache/mhs35_weather.json`, cartoon scenes, IP helpers.
+- `mhs35fb/weather.py` — weather façade and weather-only run loop.
+- `mhs35fb/weather_model.py` — `Weather` dataclass and location constants.
+- `mhs35fb/weather_providers.py` — CMA/itboy/Open-Meteo/AQ providers and multi-source merge; must stay Pillow-free.
+- `mhs35fb/weather_display.py` — cartoon scenes and weather panel rendering.
+- `mhs35fb/weather_cache.py` — weather cache read/write.
+- `mhs35fb/net.py` — local IP helpers for the host info card.
 - `mhs35fb/cards.py` — clock/calendar card, host metrics card, page composition and dots.
 - `mhs35fb/touch.py` — SPI0 CS1 touch evdev reader (bus address + ABS/button capability detection, no name matching). Any tap cycles cards; raw coordinates are not calibrated and are not used for navigation.
 - `mhs35dash.py` — dashboard loop plus background weather worker; starts on the weather card; taps cycle weather → clock → host.
@@ -42,6 +47,8 @@ Entry points: `mhs35dash.py` (multi-card dashboard, runs as a systemd service), 
 ## Conventions
 
 - Keep the framebuffer layer dependency-light; Pillow is the only required third-party package, numpy is optional.
+- Keep `weather_providers.py` Pillow-free; weather drawing belongs in `weather_display.py`.
+- Weather modules must not import `net`; IP belongs to the host info card only.
 - Render code receives width/height from the detected framebuffer; do not hardcode 480x320 in shared drawing code.
 - Commit only when asked; use short lowercase messages such as `add MHS35 dashboard and standalone installer`.
 - This is an independent repo (branch `main`, no remote); the Pi deployment is a copy, not a clone.

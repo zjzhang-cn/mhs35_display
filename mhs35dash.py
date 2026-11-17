@@ -61,7 +61,7 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="weather retry delay (default: 60)")
     parser.add_argument("--timeout", type=_positive_int, default=8, metavar="SECONDS",
                         help="network timeout (default: 8)")
-    parser.add_argument("--provider", choices=("auto", "itboy", "open-meteo"), default="auto")
+    parser.add_argument("--provider", choices=("auto", "cma", "itboy", "open-meteo"), default="auto")
     parser.add_argument("--lat", type=float, default=weather_mod.BEIJING_LAT)
     parser.add_argument("--lon", type=float, default=weather_mod.BEIJING_LON)
     parser.add_argument("--preview", metavar="PNG", help="render one card to PNG and exit")
@@ -153,8 +153,7 @@ def _preview(args) -> int:
         except Exception:  # noqa: BLE001 - preview can fall back to cache
             pass
         card = cards.render_weather_card(width, card_height, weather, stale=stale,
-                                         interval=args.interval, font_path=args.font,
-                                         show_ip=False)
+                                         interval=args.interval, font_path=args.font)
     elif name == "clock":
         card = cards.render_clock_card(width, card_height, datetime.now(), font_path=args.font)
     else:
@@ -225,7 +224,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 if dirty or version != last_weather_version or now_mono - last_weather_draw >= 30:
                     card = cards.render_weather_card(
                         width, card_height, weather, stale=stale,
-                        interval=args.interval, font_path=args.font, show_ip=False,
+                        interval=args.interval, font_path=args.font,
                     )
                     framebuffer.blit(cards.compose(card, index, width, height, args.font))
                     last_weather_version = version

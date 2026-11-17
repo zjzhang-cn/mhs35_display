@@ -19,7 +19,12 @@ mhs35_display/
 │   ├── __init__.py
 │   ├── framebuffer.py    # 帧缓冲探测、mmap、RGB565 输出
 │   ├── render.py         # Pillow 文本/图片渲染
-│   ├── weather.py        # 天气获取、卡通场景、缓存
+│   ├── weather.py        # 天气门面与运行循环
+│   ├── weather_model.py  # 天气数据模型与位置常量
+│   ├── weather_providers.py  # CMA/itboy/Open-Meteo/AQ 与合并
+│   ├── weather_display.py    # 天气卡通场景与面板渲染
+│   ├── weather_cache.py  # 天气缓存
+│   ├── net.py            # 主机信息 IP 辅助
 │   ├── cards.py          # 时钟日历、主机信息、页面指示
 │   └── touch.py          # SPI 触摸读取与点击检测
 ├── systemd/
@@ -134,13 +139,14 @@ python3 mhs35weather.py --interval 600
 python3 mhs35weather.py --interval 600 --retry 60 --timeout 10
 ```
 
-画面内容：北京天气卡通场景（太阳/月亮、云朵、雨雪雷雾）、当前温度与天气、最高/最低温、湿度、风向风力、空气质量与 PM2.5、本机 IP 与网卡名、数据更新时间。
+画面内容：北京天气卡通场景（太阳/月亮、云朵、雨雪雷雾）、当前温度与天气、最高/最低温、湿度、风向风力、空气质量与 PM2.5、数据更新时间。本机 IP 只在仪表盘的主机信息卡片中显示。
 
-- 数据源：默认 `auto`，优先 `t.weather.itboy.net`（国内可直连），失败后尝试 Open-Meteo。
+- 数据源：默认 `auto`，优先 `weather.cma.cn`（中国气象局，北京站 `54511`）；失败或关键字段不全时按 itboy → Open-Meteo 回退。
+- 空气质量：天气源不含 PM2.5 时（CMA / Open-Meteo），先请求 itboy，失败后再请求 `air-quality-api.open-meteo.com`；PM2.5 按中国浓度标准换算等级，空气质量请求失败不影响天气显示。
 - 缓存：成功数据写入 `$XDG_CACHE_HOME/mhs35_weather.json`（默认 `~/.cache/mhs35_weather.json`）。断网时继续显示上次数据，并出现橙色 `离线 · 上次数据` 标记，恢复网络后自动刷新。
 - 刷新间隔由 `--interval` 控制（默认 600 秒），失败重试由 `--retry` 控制（默认 60 秒）。
-- 其他参数：`--provider itboy|open-meteo|auto`、`--lat`/`--lon`、`--size`、`--font`、`--fb`、`--quiet`。
-- `--lat`/`--lon` 只对 Open-Meteo 生效（`--provider itboy` 固定为北京），画面中的城市名固定显示“北京”。
+- 其他参数：`--provider cma|itboy|open-meteo|auto`、`--lat`/`--lon`、`--size`、`--font`、`--fb`、`--quiet`。
+- `--lat`/`--lon` 只对 Open-Meteo 生效（CMA 使用固定站号 `54511`，itboy 固定为北京），画面中的城市名固定显示“北京”。
 
 ### 开机自动运行（systemd）
 
@@ -194,5 +200,8 @@ ssh pi@<pi-ip> 'python3 ~/mhs35_display/mhs35weather.py --once'
 - 自动探测：只选择 SPI0 CS0（bus address `spi0.0`）上的 480×320/320×480 帧缓冲，判断依据是 `/sys/class/graphics/fbN` 的 bus/address，不按设备名称匹配；DRM/HDMI 帧缓冲不会被写入。
 - 触摸设备同样按 SPI0 CS1（`spi0.1`）识别；显示设备不在 `spi0.0` 或触摸设备不在 `spi0.1` 时，可分别用 `--fb` / `--touch-device` 手动指定。
 - 输出格式为 RGB565（16bpp），若帧缓冲为 32bpp 则按 BGRX 输出。
-- 天气数据无需 API key，只需网络；默认 `auto` 先请求 itboy，失败后再请求 Open-Meteo；`--provider` 可强制单一数据源（此时没有回退）。
+- 天气数据无需 API key，只需网络；默认 `auto` 先请求 CMA，失败或字段不全时依次尝试 itboy 和 Open-Meteo；`--provider` 可强制单一数据源（此时没有回退）。
+- CMA 默认使用北京站 `54511`；其他城市可修改 `mhs35fb/weather.py` 中的 `CMA_STATION_ID`。
+- PM2.5 等级按中国标准由浓度换算：≤35 优、≤75 良、≤115 轻度污染、≤150 中度污染、≤250 重度污染，更高为严重污染。
+- `weather.cma.cn` 在部分网络下可能触发访问校验；此时 `auto` 会自动回退到 itboy / Open-Meteo。
 - 触摸输入未包含在 `mhs35disp.py` 中。
