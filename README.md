@@ -26,6 +26,7 @@ mhs35_display/
 │   ├── mhs35-weather.service
 │   └── mhs35-dashboard.service
 ├── requirements.txt
+├── AGENTS.md             # 维护与开发约定
 └── README.md
 ```
 
@@ -43,7 +44,7 @@ sudo ./install.sh --install-deps   # 同时安装 python3-pil / python3-numpy
 
 - 安装前会把 `/boot/firmware/config.txt`（旧系统为 `/boot/config.txt`）备份为 `config.txt.bak-mhs35-<时间>`。
 - 自动启用 `dtparam=spi=on`，复制 `overlays/mhs35.dtbo`，写入 `dtoverlay=mhs35:rotate=90`。
-- 安装 `udev/99-mhs35-touch-ignore.rules`，让桌面（libinput/Wayfire）忽略 SPI0 CS1 触摸。触摸设备仍由 `mhs35dash` 直接读取，HDMI 桌面上的鼠标键盘不受影响。
+- 安装 `udev/99-mhs35-touch-ignore.rules`，让使用 libinput 的桌面环境（如 Wayfire）忽略 SPI0 CS1 触摸。触摸设备仍由 `mhs35dash` 直接读取，HDMI 桌面上的鼠标键盘不受影响。
 - 安装后需要重启：`sudo reboot`；加 `--reboot` 可自动重启。
 - 卸载后重启可恢复 HDMI 输出，并移除上述 udev 规则。
 
@@ -65,7 +66,7 @@ sudo ./install.sh --install-deps   # 同时安装 python3-pil / python3-numpy
    sudo apt install python3-pil python3-numpy
    ```
 
-3. 当前用户需要能读写 `/dev/fbN`（`video` 组），否则用 `sudo` 运行。
+3. 当前用户需要能读写 `/dev/fbN`（`video` 组）和 `/dev/input/event*`（`input` 组）；权限不足时用 `sudo` 运行。
 
 ## 用法
 
@@ -84,7 +85,7 @@ python3 mhs35disp.py --image logo.png --fit contain --text "Booting..."
 printf 'Line 1\nLine 2\n' > status.txt
 python3 mhs35disp.py --text-file status.txt
 
-# 列出帧缓冲设备（* 表示自动选中的 MHS35）
+# 列出帧缓冲设备（* 表示自动选中的 MHS35，含 SPI bus/address）
 python3 mhs35disp.py --list
 
 # 显示测试彩条
@@ -111,6 +112,7 @@ python3 mhs35disp.py "你好" --preview hello.png --size 480x320
 | `--align / --valign` | 水平 / 垂直对齐 |
 | `--rotate 0\|90\|180\|270` | 内容顺时针旋转（overlay 已按 90° 配置时可保持 0） |
 | `--fb PATH` | 手动指定帧缓冲，默认自动探测 |
+| `--size WxH` | 仅用于 `--preview` 的渲染尺寸，默认自动探测（不可用时为 480x320） |
 | `--preview PNG` | 只渲染到 PNG，不写屏 |
 | `--list` | 列出帧缓冲设备 |
 | `--demo` | 显示测试彩条 |
@@ -135,9 +137,10 @@ python3 mhs35weather.py --interval 600 --retry 60 --timeout 10
 画面内容：北京天气卡通场景（太阳/月亮、云朵、雨雪雷雾）、当前温度与天气、最高/最低温、湿度、风向风力、空气质量与 PM2.5、本机 IP 与网卡名、数据更新时间。
 
 - 数据源：默认 `auto`，优先 `t.weather.itboy.net`（国内可直连），失败后尝试 Open-Meteo。
-- 缓存：成功数据写入 `~/.cache/mhs35_weather.json`。断网时继续显示上次数据，并出现橙色 `离线 · 上次数据` 标记，恢复网络后自动刷新。
+- 缓存：成功数据写入 `$XDG_CACHE_HOME/mhs35_weather.json`（默认 `~/.cache/mhs35_weather.json`）。断网时继续显示上次数据，并出现橙色 `离线 · 上次数据` 标记，恢复网络后自动刷新。
 - 刷新间隔由 `--interval` 控制（默认 600 秒），失败重试由 `--retry` 控制（默认 60 秒）。
-- 其他参数：`--provider itboy|open-meteo|auto`、`--lat`/`--lon`、`--font`、`--fb`、`--quiet`。
+- 其他参数：`--provider itboy|open-meteo|auto`、`--lat`/`--lon`、`--size`、`--font`、`--fb`、`--quiet`。
+- `--lat`/`--lon` 只对 Open-Meteo 生效（`--provider itboy` 固定为北京），画面中的城市名固定显示“北京”。
 
 ### 开机自动运行（systemd）
 
@@ -162,8 +165,9 @@ python3 mhs35dash.py --preview dash.png --card host
 - 天气卡片：与 `mhs35weather.py` 相同的卡通场景，后台每 `--interval` 秒刷新；IP 只在主机卡片显示。
 - 时间日历卡片：大号数字时钟（含秒）、日期/星期、当月日历，今天高亮。
 - 主机信息卡片：主机名/核心数、IP/网卡、内核、CPU 温度、负载、内存、磁盘使用率、运行时长。
-- 触摸自动查找 SPI0 CS1 上的触摸输入设备；可用 `--touch-device /dev/input/eventN`、`--no-touch`、`--touch-debug` 调试原始事件。
-- 同一时间只能有一个程序写 `/dev/fb1`；运行仪表盘前先停掉天气服务。
+- 天气刷新参数与 `mhs35weather.py` 相同：`--interval`（默认 600）、`--retry`（默认 60）、`--timeout`（默认 8）、`--provider`、`--lat`/`--lon`。
+- 触摸自动查找 SPI0 CS1（bus address `spi0.1`）上同时具备 ABS_X/ABS_Y 和按下能力（压力轴或 `BTN_TOUCH`）的输入设备，不按设备名匹配；可用 `--touch-device /dev/input/eventN`、`--no-touch`、`--touch-debug` 调试原始事件。
+- 同一时间只能有一个程序写 `/dev/fbN`；运行仪表盘前先停掉天气服务。
 
 ### 开机自动运行（仪表盘）
 
@@ -187,7 +191,8 @@ ssh pi@<pi-ip> 'python3 ~/mhs35_display/mhs35weather.py --once'
 
 ## 说明
 
-- 自动探测：只选择 SPI0 CS0 上的 480×320/320×480 帧缓冲，不按设备名称匹配；DRM/HDMI 帧缓冲不会被写入。
+- 自动探测：只选择 SPI0 CS0（bus address `spi0.0`）上的 480×320/320×480 帧缓冲，判断依据是 `/sys/class/graphics/fbN` 的 bus/address，不按设备名称匹配；DRM/HDMI 帧缓冲不会被写入。
+- 触摸设备同样按 SPI0 CS1（`spi0.1`）识别；显示设备不在 `spi0.0` 或触摸设备不在 `spi0.1` 时，可分别用 `--fb` / `--touch-device` 手动指定。
 - 输出格式为 RGB565（16bpp），若帧缓冲为 32bpp 则按 BGRX 输出。
-- 天气数据无需 API key，只需网络；Open-Meteo 在部分网络下不可达时会自动改用 itboy。
+- 天气数据无需 API key，只需网络；默认 `auto` 先请求 itboy，失败后再请求 Open-Meteo；`--provider` 可强制单一数据源（此时没有回退）。
 - 触摸输入未包含在 `mhs35disp.py` 中。
