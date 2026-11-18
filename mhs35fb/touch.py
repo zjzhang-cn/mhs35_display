@@ -159,13 +159,13 @@ class TouchReader(threading.Thread):
                 while len(buffer) >= _EVENT.size:
                     event = _EVENT.unpack_from(buffer)
                     buffer = buffer[_EVENT.size:]
-                    self._handle(*event)
+                    self._dispatch(*event)
         finally:
             if self._fd is not None:
                 os.close(self._fd)
                 self._fd = None
 
-    def _handle(self, seconds, microseconds, type_, code, value) -> None:
+    def _dispatch(self, seconds, microseconds, type_, code, value) -> None:
         if self.debug and type_ != EV_SYN:
             print(f"touch: type={type_} code={code} value={value}", flush=True)
         if type_ == EV_KEY and code == BTN_TOUCH:
